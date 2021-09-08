@@ -24,6 +24,7 @@ type (
 		MaxFetch int    `short:"m" default:"200" help:"How many likes to be fetched."`
 		Template bool   `short:"t" help:"Print config template."`
 		Verbose  bool   `short:"v" help:"Verbose printing."`
+		About    bool   `help:"Show about."`
 	}
 	credentials struct {
 		ConsumerKey    string `json:"consumer_key"`
@@ -51,6 +52,11 @@ func (c *command) exec() {
 }
 
 func (c *command) run() (err error) {
+	if c.About {
+		fmt.Println("Visit https://github.com/gonejack/tumblr-likes")
+		return
+	}
+
 	if c.Template {
 		bytes, _ := json.MarshalIndent(&c.credentials, "", "    ")
 		fmt.Printf("%s", bytes)

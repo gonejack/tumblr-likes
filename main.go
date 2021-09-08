@@ -8,6 +8,7 @@ import (
 func init() {
 	log.SetOutput(os.Stdout)
 }
+
 func main() {
 	var cmd command
 	cmd.exec()
