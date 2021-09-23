@@ -36,7 +36,7 @@ type credentials struct {
 }
 type record struct {
 	gorm.Model
-	URL string
+	URL string `gorm:"index"`
 }
 
 type command struct {
