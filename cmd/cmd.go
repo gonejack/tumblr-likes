@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"encoding/json"
@@ -12,56 +12,68 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/gonejack/get"
+	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/spf13/cast"
 	"github.com/tumblr/tumblr.go"
 	"github.com/tumblr/tumblrclient.go"
+	"github.com/uniplaces/carbon"
 )
 
-type (
-	options struct {
-		Config   string `short:"c" default:"config.json" help:"Config file."`
-		Output   string `short:"o" default:"likes" help:"Output directory."`
-		MaxFetch int    `short:"m" default:"200" help:"How many likes to be fetched."`
-		Template bool   `short:"t" help:"Print config template."`
-		Verbose  bool   `short:"v" help:"Verbose printing."`
-		About    bool   `help:"Show about."`
-	}
-	credentials struct {
-		ConsumerKey    string `json:"consumer_key"`
-		ConsumerSecret string `json:"consumer_secret"`
-		Token          string `json:"token"`
-		TokenSecret    string `json:"token_secret"`
-	}
-)
+type options struct {
+	Config   string `short:"c" default:"config.json" help:"Config file."`
+	Output   string `short:"o" default:"likes" help:"Output directory."`
+	MaxFetch int    `short:"m" default:"200" help:"How many likes to be fetched."`
+	Template bool   `short:"t" help:"Print config template."`
+	Verbose  bool   `short:"v" help:"Verbose printing."`
+	About    bool   `help:"Show about."`
+}
+type credentials struct {
+	ConsumerKey    string `json:"consumer_key"`
+	ConsumerSecret string `json:"consumer_secret"`
+	Token          string `json:"token"`
+	TokenSecret    string `json:"token_secret"`
+}
+type record struct {
+	gorm.Model
+	URL string
+}
 
 type command struct {
 	options
 	credentials
+
 	client *tumblrclient.Client
+	db     *gorm.DB
 }
 
-func (c *command) exec() {
+func (c *command) Run() (err error) {
 	kong.Parse(&c.options,
 		kong.Name("tumblr-likes"),
 		kong.Description("Save tumblr liked images."),
 		kong.UsageOnError(),
 	)
-	if err := c.run(); err != nil {
-		log.Fatal(err)
-	}
+	return c.run()
 }
-
 func (c *command) run() (err error) {
-	if c.About {
+	switch {
+	case c.Template:
+		bytes, _ := json.MarshalIndent(&c.credentials, "", "    ")
+		fmt.Printf("%s", bytes)
+		return
+	case c.About:
 		fmt.Println("Visit https://github.com/gonejack/tumblr-likes")
 		return
 	}
 
-	if c.Template {
-		bytes, _ := json.MarshalIndent(&c.credentials, "", "    ")
-		fmt.Printf("%s", bytes)
-		return
+	dbname := "record.db"
+	c.db, err = gorm.Open("sqlite3", dbname)
+	if err != nil {
+		return fmt.Errorf("open db file %s failed: %s", dbname, err)
 	}
+	c.db.AutoMigrate(new(record))
+	c.db.Unscoped().Delete(new(record), "updated_at < ?", carbon.Now().SubYear().String())
+	defer c.db.Close()
 
 	// parse config
 	bytes, err := ioutil.ReadFile(c.Config)
@@ -128,26 +140,29 @@ func (c *command) download(posts []tumblr.PostInterface) (err error) {
 	}
 
 	tasks := get.NewDownloadTasks()
-
-	for _, i := range posts {
-		switch post := i.(type) {
+	for _, p := range posts {
+		switch post := p.(type) {
 		case *tumblr.PhotoPost:
 			for _, photo := range post.Photos {
-				tasks.Add(photo.OriginalSize.Url, filepath.Join(c.Output, filepath.Base(photo.OriginalSize.Url)))
+				r := new(record)
+				c.db.First(r, "url == ?", photo.OriginalSize.Url)
+				if r.URL == "" {
+					tasks.Add(photo.OriginalSize.Url, filepath.Join(c.Output, filepath.Base(photo.OriginalSize.Url)))
+				}
 			}
 		}
 	}
-
-	g := get.Default()
-	g.OnEachStart = func(t *get.DownloadTask) {
+	geter := get.Default()
+	geter.OnEachStart = func(t *get.DownloadTask) {
 		if c.Verbose {
 			log.Printf("save %s", t.Link)
 		}
 	}
-	g.Batch(tasks, 5, time.Minute)
-
+	geter.Batch(tasks, 5, time.Minute)
 	tasks.ForEach(func(t *get.DownloadTask) {
-		if t.Err != nil {
+		if t.Err == nil {
+			c.db.Save(&record{URL: t.Link})
+		} else {
 			log.Printf("save %s as %s failed: %s", t.Link, t.Path, t.Err)
 		}
 	})
@@ -161,4 +176,8 @@ func reverse(s interface{}) {
 	for i, j := 0, size-1; i < j; i, j = i+1, j-1 {
 		swap(i, j)
 	}
+}
+
+func New() *command {
+	return new(command)
 }
