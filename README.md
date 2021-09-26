@@ -11,27 +11,26 @@ Command line tool for download tumblr like images.
 ```
 
 ### Usage
-1. get credentials from
+1. Get credentials
 ```
 https://api.tumblr.com/console/calls/user/info 
 ```
-2. build config.json
+2. Edit config.json
 ```shell
-> tumblr-likes -t > config.json
+> tumblr-likes -t > config.json && open config.json
 ```
-3. fetch likes
+3. Get likes
 ```shell
 > tumblr-likes -v
 ```
 
+### Flags
 ```
-Usage:
-  tumblr-likes [flags]
-
-Flags:
-  -c, --config string   config file (default "config.json")
-  -o, --outdir string   output directory (default "likes")
-  -t, --template        print config template
-  -v, --verbose         verbose
-  -h, --help            help for tumblr-likes
+  -h, --help                    Show context-sensitive help.
+  -c, --config="config.json"    Config file.
+  -o, --output="likes"          Output directory.
+  -m, --max-fetch=200           How many likes to be fetched.
+  -t, --template                Print config template.
+  -v, --verbose                 Verbose printing.
+      --about                   Show about.
 ```
