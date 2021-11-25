@@ -3,15 +3,15 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/url"
+	"os"
 	"path/filepath"
 	"reflect"
 	"time"
 
 	"github.com/alecthomas/kong"
-	"github.com/gonejack/get"
+	"github.com/gonejack/gex"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/spf13/cast"
@@ -76,7 +76,7 @@ func (c *command) run() (err error) {
 	defer c.db.Close()
 
 	// parse config
-	bytes, err := ioutil.ReadFile(c.Config)
+	bytes, err := os.ReadFile(c.Config)
 	if err == nil {
 		err = json.Unmarshal(bytes, &c.credentials)
 	}
@@ -139,7 +139,7 @@ func (c *command) download(posts []tumblr.PostInterface) (err error) {
 		log.Printf("process %d posts", len(posts))
 	}
 
-	tasks := get.NewDownloadTasks()
+	bat := gex.NewBatch(3)
 	for _, p := range posts {
 		switch post := p.(type) {
 		case *tumblr.PhotoPost:
@@ -147,27 +147,33 @@ func (c *command) download(posts []tumblr.PostInterface) (err error) {
 				r := new(record)
 				c.db.First(r, "url == ?", photo.OriginalSize.Url)
 				if r.URL == "" {
-					tasks.Add(photo.OriginalSize.Url, filepath.Join(c.Output, filepath.Base(photo.OriginalSize.Url)))
+					request := gex.NewRequest("", photo.OriginalSize.Url)
+					request.Output = filepath.Join(c.Output, filepath.Base(photo.OriginalSize.Url))
+					request.Timeout = time.Minute
+					bat.Add(request)
 				}
 			}
 		}
 	}
-	geter := get.Default()
-	geter.OnEachStart = func(t *get.DownloadTask) {
+	bat.OnStart(func(r *gex.Request) {
 		if c.Verbose {
-			log.Printf("save %s", t.Link)
-		}
-	}
-	geter.Batch(tasks, 5, time.Minute)
-	tasks.ForEach(func(t *get.DownloadTask) {
-		if t.Err == nil {
-			c.db.Save(&record{URL: t.Link})
-		} else {
-			log.Printf("save %s as %s failed: %s", t.Link, t.Path, t.Err)
+			log.Printf("save %s", r.Url)
 		}
 	})
+	bat.OnStop(func(r *gex.Request, err error) {
+		if err == nil {
+			c.db.Save(&record{URL: r.Url})
+		} else {
+			log.Printf("save %s as %s failed: %s", r.Url, r.Output, err)
+		}
+	})
+	bat.Run(nil)
 
 	return
+}
+
+func New() *command {
+	return new(command)
 }
 
 func reverse(s interface{}) {
@@ -176,8 +182,4 @@ func reverse(s interface{}) {
 	for i, j := 0, size-1; i < j; i, j = i+1, j-1 {
 		swap(i, j)
 	}
-}
-
-func New() *command {
-	return new(command)
 }
