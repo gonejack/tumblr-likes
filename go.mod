@@ -1,6 +1,6 @@
 module github.com/gonejack/tumblr-likes
 
-go 1.17
+go 1.20
 
 require (
 	github.com/alecthomas/kong v0.2.17
@@ -13,10 +13,10 @@ require (
 )
 
 require (
-	github.com/dghubble/oauth1 v0.7.0 // indirect
+	github.com/dghubble/oauth1 v0.7.2 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/mattn/go-sqlite3 v1.14.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4 // indirect
+	golang.org/x/net v0.0.0-20210610124326-52da8fb2a613 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
 )

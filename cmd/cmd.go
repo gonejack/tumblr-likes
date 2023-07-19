@@ -107,11 +107,9 @@ func (c *command) fetch() (posts []tumblr.PostInterface, err error) {
 	offset := 0
 	for len(posts) < want {
 		param.Set("offset", cast.ToString(offset))
-
 		if c.Verbose {
 			log.Printf("fetch likes %03d-%03d/%d", len(posts), len(posts)+limit, want)
 		}
-
 		likes, err := tumblr.GetLikes(c.client, param)
 		if err != nil {
 			return nil, err
@@ -138,7 +136,6 @@ func (c *command) download(posts []tumblr.PostInterface) (err error) {
 	if c.Verbose {
 		log.Printf("process %d posts", len(posts))
 	}
-
 	bat := gex.NewBatch(3)
 	for _, p := range posts {
 		switch post := p.(type) {
@@ -147,10 +144,10 @@ func (c *command) download(posts []tumblr.PostInterface) (err error) {
 				r := new(record)
 				c.db.First(r, "url == ?", photo.OriginalSize.Url)
 				if r.URL == "" {
-					request := gex.NewRequest("", photo.OriginalSize.Url)
-					request.Output = filepath.Join(c.Output, filepath.Base(photo.OriginalSize.Url))
-					request.Timeout = time.Minute
-					bat.Add(request)
+					rq := gex.NewRequest("", photo.OriginalSize.Url)
+					rq.Output = filepath.Join(c.Output, filepath.Base(photo.OriginalSize.Url))
+					rq.Timeout = time.Minute
+					bat.Add(rq)
 				}
 			}
 		}
