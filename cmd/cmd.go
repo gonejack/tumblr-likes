@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"reflect"
 	"time"
 
 	"github.com/alecthomas/kong"
@@ -84,18 +83,11 @@ func (c *command) run() (err error) {
 		return fmt.Errorf("read config file failed: %s", err)
 	}
 	c.client = tumblrclient.NewClientWithToken(c.ConsumerKey, c.ConsumerSecret, c.Token, c.TokenSecret)
-
 	posts, err := c.fetch()
 	if err != nil {
 		return
 	}
-
-	err = c.download(posts)
-	if err != nil {
-		return
-	}
-
-	return
+	return c.download(posts)
 }
 func (c *command) fetch() (posts []tumblr.PostInterface, err error) {
 	const limit = 50
@@ -119,17 +111,12 @@ func (c *command) fetch() (posts []tumblr.PostInterface, err error) {
 			return nil, err
 		}
 		posts = append(posts, full...)
-
 		offset += len(likes.Posts)
 		if int(likes.TotalLikes) < want {
 			want = int(likes.TotalLikes)
 		}
 	}
-
-	if len(posts) > 0 {
-		reverse(posts)
-	}
-
+	reverse(posts)
 	return
 }
 func (c *command) download(posts []tumblr.PostInterface) (err error) {
@@ -165,7 +152,6 @@ func (c *command) download(posts []tumblr.PostInterface) (err error) {
 		}
 	})
 	bat.Run(nil)
-
 	return
 }
 
@@ -173,10 +159,8 @@ func New() *command {
 	return new(command)
 }
 
-func reverse(s interface{}) {
-	size := reflect.ValueOf(s).Len()
-	swap := reflect.Swapper(s)
-	for i, j := 0, size-1; i < j; i, j = i+1, j-1 {
-		swap(i, j)
+func reverse[T any](s []T) {
+	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
+		s[i], s[j] = s[j], s[i]
 	}
 }
