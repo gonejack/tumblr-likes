@@ -6,9 +6,7 @@ builds:
       - darwin
     goarch:
       - amd64
-    ignore:
-      - goos: windows
-        goarch: arm64
+      - arm64
 
 archives:
   - format: zip

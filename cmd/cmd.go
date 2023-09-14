@@ -7,8 +7,11 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/alecthomas/kong"
 	"github.com/gonejack/gex"
 	"github.com/jinzhu/gorm"
@@ -17,6 +20,7 @@ import (
 	"github.com/tumblr/tumblr.go"
 	"github.com/tumblr/tumblrclient.go"
 	"github.com/uniplaces/carbon"
+	"slices"
 )
 
 type options struct {
@@ -116,16 +120,44 @@ func (c *command) fetch() (posts []tumblr.PostInterface, err error) {
 			want = int(likes.TotalLikes)
 		}
 	}
-	reverse(posts)
+	slices.Reverse(posts)
 	return
 }
 func (c *command) download(posts []tumblr.PostInterface) (err error) {
 	if c.Verbose {
 		log.Printf("process %d posts", len(posts))
 	}
+	re := regexp.MustCompile(` \d{2,4}w$`)
 	bat := gex.NewBatch(3)
 	for _, p := range posts {
 		switch post := p.(type) {
+		case *tumblr.TextPost:
+			doc, err := goquery.NewDocumentFromReader(strings.NewReader(post.Body))
+			if err != nil {
+				continue
+			}
+			doc.Find("img").Each(func(i int, e *goquery.Selection) {
+				attr, ok := e.Attr("srcset")
+				if !ok {
+					return
+				}
+				srcset := strings.Split(attr, ",")
+				slices.Reverse(srcset)
+				for _, src := range srcset {
+					src = strings.TrimSpace(src)
+					if !re.MatchString(src) {
+						continue
+					}
+					u := re.ReplaceAllString(src, "")
+					if len(u) > 0 {
+						rq := gex.NewRequest("", u)
+						rq.Output = filepath.Join(c.Output, filepath.Base(u))
+						rq.Timeout = time.Minute
+						bat.Add(rq)
+						return
+					}
+				}
+			})
 		case *tumblr.PhotoPost:
 			for _, photo := range post.Photos {
 				r := new(record)
@@ -157,10 +189,4 @@ func (c *command) download(posts []tumblr.PostInterface) (err error) {
 
 func New() *command {
 	return new(command)
-}
-
-func reverse[T any](s []T) {
-	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
-		s[i], s[j] = s[j], s[i]
-	}
 }

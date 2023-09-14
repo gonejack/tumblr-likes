@@ -1,8 +1,9 @@
 module github.com/gonejack/tumblr-likes
 
-go 1.20
+go 1.21
 
 require (
+	github.com/PuerkitoBio/goquery v1.5.1
 	github.com/alecthomas/kong v0.2.17
 	github.com/gonejack/gex v0.1.1
 	github.com/jinzhu/gorm v1.9.16
@@ -13,6 +14,7 @@ require (
 )
 
 require (
+	github.com/andybalholm/cascadia v1.1.0 // indirect
 	github.com/dghubble/oauth1 v0.7.2 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/mattn/go-sqlite3 v1.14.0 // indirect
